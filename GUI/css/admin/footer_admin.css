@@ -1,0 +1,19 @@
+<?php
+
+/*
+ * This file is part of the Symfony package.
+ *
+ * (c) Fabien Potencier <fabien@symfony.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+namespace Symfony\Component\DependencyInjection\Loader;
+
+use Symfony\Component\Config\Builder\ConfigBuilderGenerator;
+use Symfony\Component\Config\Builder\ConfigBuilderGeneratorInterface;
+use Symfony\Component\Config\Builder\ConfigBuilderInterface;
+use Symfony\Component\Config\FileLocatorInterface;
+use Symfony\Component\DependencyInjection\Attribute\When;
+use Symfo

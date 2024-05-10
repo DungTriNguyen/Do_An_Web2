@@ -1,0 +1,83 @@
+ace));
+        }
+
+        $autoconfigureAttributes = new RegisterAutoconfigureAttributesPass();
+        $autoconfigureAttributes = $autoconfigureAttributes->accept($prototype) ? $autoconfigureAttributes : null;
+        $classes = $this->findClasses($namespace, $resource, (array) $exclude, $autoconfigureAttributes);
+        // prepare for deep cloning
+        $serializedPrototype = serialize($prototype);
+
+        foreach ($classes as $class => $errorMessage) {
+            if (null === $errorMessage && $autoconfigureAttributes && $this->env) {
+                $r = $this->container->getReflectionClass($class);
+                $attribute = null;
+                foreach ($r->getAttributes(When::class) as $attribute) {
+                    if ($this->env === $attribute->newInstance()->env) {
+                        $attribute = null;
+                        break;
+                    }
+                }
+                if (null !== $attribute) {
+                    continue;
+                }
+            }
+
+            if (interface_exists($class, false)) {
+                $this->interfaces[] = $class;
+            } else {
+                $this->setDefinition($class, $definition = unserialize($serializedPrototype));
+                if (null !== $errorMessage) {
+                    $definition->addError($errorMessage);
+
+                    continue;
+                }
+                foreach (class_implements($class, false) as $interface) {
+                    $this->singlyImplemented[$interface] = ($this->singlyImplemented[$interface] ?? $class) !== $class ? false : $class;
+                }
+            }
+        }
+
+        if ($this->autoRegisterAliasesForSinglyImplementedInterfaces) {
+            $this->registerAliasesForSinglyImplementedInterfaces();
+        }
+    }
+
+    public function registerAliasesForSinglyImplementedInterfaces()
+    {
+        foreach ($this->interfaces as $interface) {
+            if (!empty($this->singlyImplemented[$interface]) && !$this->container->has($interface)) {
+                $this->container->setAlias($interface, $this->singlyImplemented[$interface]);
+            }
+        }
+
+        $this->interfaces = $this->singlyImplemented = [];
+    }
+
+    /**
+     * Registers a definition in the container with its instanceof-conditionals.
+     */
+    protected function setDefinition(string $id, Definition $definition)
+    {
+        $this->container->removeBindings($id);
+
+        if ($this->isLoadingInstanceof) {
+            if (!$definition instanceof ChildDefinition) {
+                throw new InvalidArgumentException(sprintf('Invalid type definition "%s": ChildDefinition expected, "%s" given.', $id, get_debug_type($definition)));
+            }
+            $this->instanceof[$id] = $definition;
+        } else {
+            $this->container->setDefinition($id, $definition->setInstanceofConditionals($this->instanceof));
+        }
+    }
+
+    private function findClasses(string $namespace, string $pattern, array $excludePatterns, ?RegisterAutoconfigureAttributesPass $autoconfigureAttributes): array
+    {
+        $parameterBag = $this->container->getParameterBag();
+
+        $excludePaths = [];
+        $excludePrefix = null;
+        $excludePatterns = $parameterBag->unescapeValue($parameterBag->resolveValue($excludePatterns));
+        foreach ($excludePatterns as $excludePattern) {
+            foreach ($this->glob($excludePattern, true, $resource, true, true) as $path => $info) {
+                if (null === $excludePrefix) {
+    
